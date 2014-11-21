@@ -1,0 +1,60 @@
+---
+title: "Human Activity Recognition"
+author: "Nicholas Dell'Omo"
+output: html_document
+---
+#Background
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset). 
+
+##Data Processing
+The first step needed in this analysis is to load the needed libraries, set the working directory and load the data into R.  Note that the data was provided as training and testing data.  We will later split the training data up since the testing file only contains the 20 test cases we need to submit with this assignment.   
+```{r,echo=TRUE}
+library(caret, warn.conflicts = F)
+library(randomForest, warn.conflicts = F)
+setwd("C:/Users/569169/Documents/Coursera/Machine Learning")
+train <- read.csv("pml-training.csv")
+test<- read.csv("pml-testing.csv")
+```
+##Data Cleaning
+The first few columns in the training set aren't needed for analysis so they will be removed. Additionally, there are rows with no data or "NA" values that can also be deleted from the data set. 
+```{r,echo=TRUE}
+train.clean <- train[,-(1:7)]
+train.clean <- train.clean[colSums(is.na(train.clean)) == 0]
+train.clean <- train.clean[colSums(train.clean == "") == 0]
+test.clean <- test[,-(1:7)]
+```
+##Model Building
+As stated earlier, we will divide the training data up into training and testing data (60%/40%, respectively). We we use the training data to train the model then test our model with the testing data.  The worst thing you can do in building a model is to over train or over fit your model.  This will help us cross validate our model.
+```{r,echo=TRUE}
+inTrain <- createDataPartition(y=train.clean$classe, p=0.6, list=FALSE)
+train.new <- train.clean[inTrain,]
+test.new <- train.clean[-inTrain,]
+```
+We can now perform Cross Validation with the Random Forest technique. At the end, we use the confusion matrix to detail the accuracy and error rate. Note the seed has been set to make this reproducable.  
+
+```{r,echo=TRUE}
+set.seed(0224)
+ForestModel <- train(train.new$classe~., method="rf", data=train.new,trControl=trainControl(method="cv",3))
+```
+
+We can estimate that the out of sample error is slightly higher than the 0% in the sample error rate. It is most likely between 0% and 1%. 
+```{r,echo=TRUE}
+ModelPrediction <- predict(ForestModel, test.new)
+confusionMatrix(test.new$classe, ModelPrediction)
+```
+The accuracy of the model is 99% with a 95% Confidence interval of .988, .993. Therefore, our random forest model with a 3 fold method is an accurate model in predicting outcomes. 
+
+##Submission
+This is the code needed to create the files in order to submit our results.
+```{r,echo=TRUE}
+pml_write_files = function(x){
+  n = length(x)
+  for(i in 1:n){
+    filename = paste0("problem_id_",i,".txt")
+    write.table(x[i],file=filename,quote=FALSE,row.names=FALSE,col.names=FALSE)
+  }
+}
+
+testpred <- predict(ForestModel, test.clean)
+pml_write_files(testpred)
+```
